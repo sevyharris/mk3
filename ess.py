@@ -8,6 +8,7 @@ import yaml
 import zeus
 import mpi4py
 import scipy.stats
+import plotting
 
 use_dill = True
 if use_dill:  # Use this if you get the `TypeError: cannot pickle 'module' object` error
@@ -144,3 +145,18 @@ print(logP0.shape)
 
 MAP_index = np.argmin(np.abs(logP0 - np.max(logP0)))
 print('MAP:', logP0[MAP_index], chain0[MAP_index, :])
+
+outdir = '/home/moon/mk3/'
+
+# maximalist plotting
+# plotting.make_histograms(
+#     outdir,
+#     chain0,
+#     MAP=chain0[MAP_index, :],
+#     mean=np.nanmean(chain0, axis=0),
+#     initial=priors,
+#     parameter_names=['a', 'b']
+# )
+
+# minimal hist
+plotting.make_histograms(outdir, chain0)
