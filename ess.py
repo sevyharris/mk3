@@ -49,9 +49,13 @@ class BPEstimator():
         - 1D array of standard deviations (converted to diagonal covariance matrix)
         - 2D covariance matrix
     results_dir : str, optional
-        Directory path for saving MCMC results. Defaults to current directory
+        Directory path for saving sample chain and logP .npy files
     parameter_names : list of str, optional
         Names of the parameters for plotting purposes
+    plot_dir : str, optional
+        Directory path for saving plots
+    load_save_point : bool, False
+        Start sampling where last run left off?
 
     Notes
     -----
@@ -69,6 +73,7 @@ class BPEstimator():
         results_dir=None,
         parameter_names=None,
         plot_dir=None,
+        load_save_point=False,
     ):
         self.simulation_fn = simulation_fn
         self.priors = priors
@@ -103,6 +108,27 @@ class BPEstimator():
             self.plot_dir = plot_dir
         if not os.path.exists(self.plot_dir):
             os.makedirs(self.plot_dir, exist_ok=True)
+
+        self.load_save_point = load_save_point
+        # if we're loading a previous savepoint, need to check the shape of things
+
+        # check for existing chains if loading save point, but don't actually load here
+        if self.load_save_point and RANK == 0:
+            print("Loading previous save point...")
+
+            # load one of the existing chains to check shape
+            chain0_file = os.path.join(self.results_dir, 'chain_0.npy')
+            if not os.path.exists(chain0_file):
+                raise FileNotFoundError(f"Cannot find existing chain file {chain0_file} for loading save point.")
+            chain0 = np.load(chain0_file)
+
+            # check shape
+            if chain0.shape[2] != self.N_PARAMETERS:
+                raise ValueError(
+                    f"Loaded chain parameter dimension {chain0.shape} does not match current prior dimension {self.N_PARAMETERS}."
+                )
+            # probably not the end of the world if N_walkers or N_samples differ
+            print("Save point loaded successfully.")
 
 
     # EXPANSION - could make some sort of factory for using other kinds of distributions
@@ -154,13 +180,31 @@ class BPEstimator():
         N_ENSEMBLE_STEPS = int(N_samples / N_walkers)
 
         # EXTENSION other ways to initialize? uniform distribution?
-        walker_start_points = np.random.multivariate_normal(
-            self.priors,
-            self.prior_uncertainties,
-            size=N_walkers,
-            check_valid='warn',
-            tol=1e-8
-        )
+        if self.load_save_point:
+            # figure out which chain this processor is associated with
+            discard = 0  # already got through the burn-in
+            # load existing chains and get last positions of walkers
+            proc2chain = self.get_processor_to_chain_index(N_PROCESSORS, self.N_ZEUS_CHAINS)
+
+            if RANK in proc2chain.keys():
+                chain_index = proc2chain[RANK]
+                chain_file = os.path.join(self.results_dir, f'chain_{chain_index}.npy')
+                if not os.path.exists(chain_file):
+                    raise FileNotFoundError(f"Cannot find existing chain file {chain_file} for loading save point.")
+                chain = np.load(chain_file)
+                # get last positions of walkers
+                walker_start_points = chain[-1, :, :]
+            else:
+                # can we just ignore the non-master process walker start points?
+                walker_start_points = np.zeros((N_walkers, self.N_PARAMETERS)) + np.nan
+        else:
+            walker_start_points = np.random.multivariate_normal(
+                self.priors,
+                self.prior_uncertainties,
+                size=N_walkers,
+                check_valid='warn',
+                tol=1e-8
+            )
 
         if RANK == 0:
             print("number of chains: ", self.N_ZEUS_CHAINS)
@@ -193,8 +237,19 @@ class BPEstimator():
             proc2chain = self.get_processor_to_chain_index(N_PROCESSORS, self.N_ZEUS_CHAINS)
             if RANK in proc2chain.keys():
                 chain_index = proc2chain[RANK]
-                np.save(os.path.join(self.results_dir, f'chain_{chain_index}.npy'), chain)
-                np.save(os.path.join(self.results_dir, f'logPs_{chain_index}.npy'), logPs)
+                chain_file = os.path.join(self.results_dir, f'chain_{chain_index}.npy')
+                logP_file = os.path.join(self.results_dir, f'logPs_{chain_index}.npy')
+
+                if self.load_save_point:
+                    # need to append instead of overwrite
+                    prev_chain = np.load(chain_file)
+                    prev_logP = np.load(logP_file)
+
+                    chain = np.vstack((prev_chain, chain))
+                    logPs = np.vstack((prev_logP, logPs))
+
+                np.save(chain_file, chain)
+                np.save(logP_file, logPs)
 
     def compile_and_flatten_chains(self):
         # This function combines all the chain .npys into a single .npy.
