@@ -41,11 +41,7 @@ optimizer = ess.BPEstimator(
 
 N_samples = 1000
 optimizer.collect_samples(N_samples)
+# optimizer.make_all_plots()
 
-optimizer.make_all_plots()
-# Change sampling settings, N walkers? Maybe make this optional with sensible defaults
-
-# run sampling and save results
-
-# do plotting
+optimizer.compile_and_flatten_chains()
 

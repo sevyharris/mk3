@@ -196,6 +196,49 @@ class BPEstimator():
                 np.save(os.path.join(self.results_dir, f'chain_{chain_index}.npy'), chain)
                 np.save(os.path.join(self.results_dir, f'logPs_{chain_index}.npy'), logPs)
 
+    def compile_and_flatten_chains(self):
+        # This function combines all the chain .npys into a single .npy.
+        # Don't run this until you've finished all your sampling
+        # order of operations is to run collect_samples lots of time
+        # this produces 2 chains that grow longer and longer (not flattened)
+        # then at the end they're combined into a single flattened, combined chain
+        list_of_chains = []
+        list_of_logPs = []
+        total_samples = 0
+        for i in range(self.N_ZEUS_CHAINS):
+            chain_file = os.path.join(self.results_dir, f'chain_{i}.npy')
+            chain_i = np.load(chain_file)
+
+            logPs_file = os.path.join(self.results_dir, f'logPs_{i}.npy')
+            logP_i = np.load(logPs_file)
+
+            assert chain_i.shape[2] == self.N_PARAMETERS
+            total_samples += chain_i.shape[0]
+            list_of_chains.append(self.flatten_chain(chain_i))
+            list_of_logPs.append(self.flatten_logP(logP_i))
+        combined_chains = np.vstack(list_of_chains)
+        combined_logPs = np.hstack(list_of_logPs)
+        
+        print('final chain shape is', combined_chains.shape)
+        print('final logP shape is', combined_logPs.shape)
+
+        np.save(os.path.join(self.results_dir, 'combined_chains.npy'), combined_chains)
+        np.save(os.path.join(self.results_dir, 'combined_logPs.npy'), combined_logPs)
+
+        
+
+    def flatten_chain(self, chain):
+        # https://github.com/minaskar/zeus/blob/1abdf08252a99e9aa186dcee414f559624b3bafd/zeus/samples.py#L90
+        # Copied from zeus sample.flatten()
+        assert chain.ndim == 3
+        return chain.reshape((-1, 2), order='F')
+        
+
+    def flatten_logP(self, logP):
+        assert logP.ndim == 2
+        return logP.reshape((-1,), order='F')
+
+
     def make_all_plots(self):
         if RANK > 0:
             return
@@ -204,10 +247,8 @@ class BPEstimator():
         chain0 = np.load(os.path.join(self.results_dir, 'chain_0.npy'))
         logP0 = np.load(os.path.join(self.results_dir, 'logPs_0.npy'))
 
-        # https://github.com/minaskar/zeus/blob/1abdf08252a99e9aa186dcee414f559624b3bafd/zeus/samples.py#L90
-        # Copied from zeus sample.flatten()
-        flattened_chain0 = chain0.reshape((-1, 2), order='F')
-        flattened_logP0 = logP0.reshape((-1,), order='F')
+        flattened_chain0 = self.flatten_chain(chain0)
+        flattened_logP0 = self.flatten_logP0(logP0)
 
         # find MAP
         MAP_index = np.argmin(np.abs(flattened_logP0 - np.max(flattened_logP0)))
