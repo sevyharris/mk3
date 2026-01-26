@@ -24,35 +24,37 @@ RANK = MPI.COMM_WORLD.Get_rank()
 np.random.seed(400 + RANK)
 
 
-
 class BPEstimator():
     """
-    A wrapper class for running zeus ensemble slice sampling
+    Bayesian Parameter Estimator using zeus ensemble slice sampling.
 
-    =================== =========================== ============================
-    Attribute           Type                        Description
-    =================== =========================== ============================
-    `index`             :class:`int`                A unique nonnegative integer index
-    `label`             ``str``                     A descriptive string label
-    `reactants`         :class:`list`               The reactant species (as :class:`Species` objects)
-    `products`          :class:`list`               The product species (as :class:`Species` objects)
-    'specific_collider'  :class:`Species`            The collider species (as a :class:`Species` object)
-    `kinetics`          :class:`KineticsModel`      The kinetics model to use for the reaction
-    `network_kinetics`  :class:`Arrhenius`          The kinetics model to use for PDep network exploration if the `kinetics` attribute is :class:PDepKineticsModel:
-    `reversible`        ``bool``                    ``True`` if the reaction is reversible, ``False`` if not
-    `transition_state`   :class:`TransitionState`    The transition state
-    `duplicate`         ``bool``                    ``True`` if the reaction is known to be a duplicate, ``False`` if not
-    `degeneracy`        :class:`double`             The reaction path degeneracy for the reaction
-    `pairs`             ``list``                    Reactant-product pairings to use in converting reaction flux to species flux
-    `allow_pdep_route`  ``bool``                    ``True`` if the reaction has an additional PDep pathway, ``False`` if not (by default), used for LibraryReactions
-    `elementary_high_p` ``bool``                    If ``True``, pressure dependent kinetics will be generated (relevant only for unimolecular library reactions)
-                                                    If ``False`` (by default), this library reaction will not be explored.
-                                                    Only unimolecular library reactions with high pressure limit kinetics should be flagged (not if the kinetics were measured at some relatively low pressure)
-    `comment`           ``str``                     A description of the reaction source (optional)
-    `is_forward`        ``bool``                    Indicates if the reaction was generated in the forward (true) or reverse (false)
-    `rank`              ``int``                     Integer indicating the accuracy of the kinetics for this reaction
-    =================== =========================== ============================
+    Parameters
+    ----------
+    simulation_fn : callable
+        A function that takes parameters and returns simulated observations.
+        Should accept a 1D numpy array of parameters and return predictions
+        at the observed data points
+    priors : array_like
+        Mean values of the prior distribution for each parameter
+    prior_uncertainties : array_like
+        Prior uncertainties for each parameter. Can be either:
+        - 1D array of standard deviations (converted to diagonal covariance matrix)
+        - 2D covariance matrix
+    observed_data_x : array_like
+        Independent variable values where observations were made
+    observed_data_y : array_like
+        Observed data values to fit
+    observed_data_y_uncertainties : array_like
+        Uncertainties in observed data. Can be either:
+        - 1D array of standard deviations (converted to diagonal covariance matrix)
+        - 2D covariance matrix
+    results_dir : str, optional
+        Directory path for saving MCMC results. Defaults to current directory.
 
+    Notes
+    -----
+    The estimator assumes Gaussian distributions for both priors and likelihoods.
+    MCMC samples are saved as 'chain_{i}.npy' and 'logPs_{i}.npy' files.
     """
     def __init__(
         self,
