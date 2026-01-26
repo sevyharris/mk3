@@ -1,6 +1,11 @@
 import os
 import matplotlib.pyplot as plt
-
+import matplotlib.colors
+import matplotlib
+import zeus
+import numpy as np
+import scipy.interpolate
+import pandas as pd
 
 MAP_COLOR = 'r'
 INITIAL_COLOR = '#00A5DF'
@@ -50,4 +55,95 @@ def make_histograms(outdir, samples, MAP=None, mean=None, initial=None, paramete
         if label_count > 0:
             plt.legend()
 
-        plt.savefig(outfile)
+        plt.savefig(outfile, bbox_inches='tight')
+
+
+def make_corner_plot(outdir, samples):
+    # this one's the same as the zeus corner plot
+    # zeus-mcmc.readthedocs.io/en/latest/notebooks/normal_distribution.html
+    fig, axes = zeus.cornerplot(samples[::100], size=(16,16))
+    outfile = os.path.join(outdir, 'cornerplot.png')
+    plt.savefig(outfile, bbox_inches='tight')
+
+
+def make_posterior_scatter_matrix(outdir, samples, parameter_names=None):
+    # convert to pandas dataframe - the PEUQSE way
+    if parameter_names is None:
+        parameter_names = [f'p{i}' for i in range(samples.shape[1])]
+        assert len(parameter_names) == samples.shape[1]
+    else:
+        parameter_names
+
+    posterior_df = pd.DataFrame(samples, columns=parameter_names)
+    pd.plotting.scatter_matrix(posterior_df)
+    outfile = os.path.join(outdir, 'posterior_scatter_matrix.png')
+
+    plt.savefig(outfile, bbox_inches='tight')
+
+
+def make_heat_scatter(outdir, samples, MAP=None, mean=None, initial=None, parameter_names=None, **kwargs):
+    # heat scatter for each pair of parameters
+    # function from PEUQSE's density_scatter
+    # colored by density https://stackoverflow.com/questions/20105364/how-can-i-make-a-scatter-plot-colored-by-density-in-matplotlib/53865762#53865762
+
+    if parameter_names is not None:
+        assert len(parameter_names) == samples.shape[1]
+    if MAP is not None:
+        assert len(MAP) == samples.shape[1]
+    if mean is not None:
+        assert len(mean) == samples.shape[1]
+    if initial is not None:
+        assert len(initial) == samples.shape[1]
+
+    # go through the pairs of parameters
+    for i in range(1, samples.shape[1]):
+        for j in range(i):
+            plt.figure()
+            x_name = f'p{i}'
+            y_name = f'p{j}'
+            if parameter_names is not None:
+                x_name = parameter_names[i]
+                y_name = parameter_names[j]
+
+            x = samples[:, i]
+            y = samples[:, j]
+
+            bin_density, x_edges, y_edges = np.histogram2d(x, y, density=True)
+            x_grid = 0.5 * (x_edges[:-1] + x_edges[1:])  # take average because interpn takes in 1 fewer point than x_edges generates
+            y_grid = 0.5 * (y_edges[:-1] + y_edges[1:])
+            data_combined = np.array([(x[i], y[i]) for i in range(len(x))])
+            sample_density = scipy.interpolate.interpn((x_grid, y_grid), bin_density, data_combined, bounds_error=False)
+
+            # plot all data even if interpolation fails
+            sample_density[np.isnan(sample_density)] = 0.0
+
+            # plot densest points on top, but maybe comment this out if it takes too long to
+            idx = sample_density.argsort()
+            x, y, sample_density = x[idx], y[idx], sample_density[idx]
+
+
+            plt.scatter(x, y, c=sample_density, s=0.8, **kwargs)
+            ax = plt.gca()
+            ax.set_box_aspect(1.0) 
+
+            if MAP is not None:
+                plt.scatter(MAP[i], MAP[j], c=MAP_COLOR, marker='x', label='MAP')
+            if mean is not None:
+                plt.scatter(mean[i], mean[j], c=MEAN_COLOR, marker='x', label='Mean')
+            if initial is not None:
+                plt.scatter(initial[i], initial[j], c=INITIAL_COLOR, marker='x', label='Initial')
+
+            label_count = len(plt.gca().get_legend_handles_labels()[0])
+            if label_count > 0:
+                plt.legend()
+
+            plt.xlabel(x_name)
+            plt.ylabel(y_name)
+            normalized_colorscale = matplotlib.colors.Normalize(vmin=np.min(sample_density), vmax=np.max(sample_density))
+            cbar = plt.colorbar(matplotlib.cm.ScalarMappable(norm=normalized_colorscale), ax=ax)
+            cbar.ax.set_ylabel('Density')
+
+            outfile = os.path.join(outdir, f'heat_scatter_{y_name}_{x_name}.png')
+            plt.savefig(outfile, bbox_inches='tight')
+
+        
