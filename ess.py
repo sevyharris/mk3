@@ -49,7 +49,9 @@ class BPEstimator():
         - 1D array of standard deviations (converted to diagonal covariance matrix)
         - 2D covariance matrix
     results_dir : str, optional
-        Directory path for saving MCMC results. Defaults to current directory.
+        Directory path for saving MCMC results. Defaults to current directory
+    parameter_names : list of str, optional
+        Names of the parameters for plotting purposes
 
     Notes
     -----
@@ -64,7 +66,9 @@ class BPEstimator():
         observed_data_x,
         observed_data_y,
         observed_data_y_uncertainties,
-        results_dir=None
+        results_dir=None,
+        parameter_names=None,
+        plot_dir=None,
     ):
         self.simulation_fn = simulation_fn
         self.priors = priors
@@ -72,7 +76,7 @@ class BPEstimator():
         self.observed_data_x = observed_data_x
         self.observed_data_y = observed_data_y
         self.observed_data_y_uncertainties = observed_data_y_uncertainties
-
+        self.parameter_names = parameter_names
         # convert 1D array of uncertainties (standard deviations) into 2D covariance matrix
         if self.prior_uncertainties.ndim == 1:
             self.prior_uncertainties = np.diag(np.float_power(self.prior_uncertainties, 2.0))
@@ -88,11 +92,18 @@ class BPEstimator():
         if N_PROCESSORS < 2:
             self.N_ZEUS_CHAINS = 1
 
-        self.results_dir = './'
+        self.results_dir = './results'
         if results_dir is not None:
             self.results_dir = results_dir
         if not os.path.exists(self.results_dir):
             os.makedirs(self.results_dir, exist_ok=True)
+
+        self.plot_dir = './plots'
+        if plot_dir is not None:
+            self.plot_dir = plot_dir
+        if not os.path.exists(self.plot_dir):
+            os.makedirs(self.plot_dir, exist_ok=True)
+
 
     # EXPANSION - could make some sort of factory for using other kinds of distributions
     def get_log_prior(self, parameters):
@@ -185,59 +196,48 @@ class BPEstimator():
                 np.save(os.path.join(self.results_dir, f'chain_{chain_index}.npy'), chain)
                 np.save(os.path.join(self.results_dir, f'logPs_{chain_index}.npy'), logPs)
 
-    
-# # print(samples.shape)
+    def make_all_plots(self):
+        if RANK > 0:
+            return
 
-# # do analysis
-# chain0 = np.load('chain_0.npy')
-# print(chain0.shape)
-# logP0 = np.load('logPs_0.npy')
-# print(logP0.shape)
+        # load just the first chain for now
+        chain0 = np.load(os.path.join(self.results_dir, 'chain_0.npy'))
+        logP0 = np.load(os.path.join(self.results_dir, 'logPs_0.npy'))
 
-# MAP_index = np.argmin(np.abs(logP0 - np.max(logP0)))
-# print('MAP:', logP0[MAP_index], chain0[MAP_index, :])
+        # https://github.com/minaskar/zeus/blob/1abdf08252a99e9aa186dcee414f559624b3bafd/zeus/samples.py#L90
+        # Copied from zeus sample.flatten()
+        flattened_chain0 = chain0.reshape((-1, 2), order='F')
+        flattened_logP0 = logP0.reshape((-1,), order='F')
 
+        # find MAP
+        MAP_index = np.argmin(np.abs(flattened_logP0 - np.max(flattened_logP0)))
+        print('MAP:', flattened_logP0[MAP_index], flattened_chain0[MAP_index, :])
 
-# # Plotting
+        # maximalist plotting
+        plotting.make_histograms(
+            self.plot_dir,
+            flattened_chain0,
+            MAP=flattened_chain0[MAP_index, :],
+            mean=np.nanmean(flattened_chain0, axis=0),
+            initial=self.priors,
+            parameter_names=self.parameter_names
+        )
 
-# outdir = '/home/moon/mk3/'
+        # # corner plot / posterior scatter matrix
+        # plotting.make_corner_plot(plot_dir, flattened_chain0)
 
-# # maximalist plotting
-# # plotting.make_histograms(
-# #     outdir,
-# #     chain0,
-# #     MAP=chain0[MAP_index, :],
-# #     mean=np.nanmean(chain0, axis=0),
-# #     initial=priors,
-# #     parameter_names=['a', 'b']
-# # )
+        # corner plot / posterior scatter matrix
+        plotting.make_posterior_scatter_matrix(self.plot_dir, flattened_chain0)
 
-# # minimal hist
-# plotting.make_histograms(outdir, chain0)
+        # heat scatter matrix
+        plotting.make_heat_scatter(
+            self.plot_dir,
+            flattened_chain0,
+            MAP=flattened_chain0[MAP_index, :],
+            mean=np.nanmean(flattened_chain0, axis=0),
+            initial=self.priors,
+            parameter_names=self.parameter_names
+        )
 
-
-# # corner plot / posterior scatter matrix
-# plotting.make_corner_plot(outdir, chain0)
-
-# # corner plot / posterior scatter matrix
-# plotting.make_posterior_scatter_matrix(outdir, chain0)
-
-# # heat scatter matrix
-# # maximal
-# plotting.make_heat_scatter(
-#     outdir,
-#     chain0,
-#     MAP=chain0[MAP_index, :],
-#     mean=np.nanmean(chain0, axis=0),
-#     initial=priors,
-#     parameter_names=['a', 'b']
-# )
-
-# # minimal
-# # plotting.make_heat_scatter(outdir, chain0)
-
-# # minimal autocorrelation
-# # plotting.make_autocorrelation(outdir, full_chain)
-
-# # maximal autocorrelation
-# plotting.make_autocorrelation(outdir, full_chain, parameter_names=['a', 'b'])
+        # maximal autocorrelation - needs full chain shape
+        plotting.make_autocorrelation(self.plot_dir, chain0, parameter_names=self.parameter_names)

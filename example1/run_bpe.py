@@ -34,13 +34,15 @@ optimizer = ess.BPEstimator(
     observed_data_x,
     observed_data_y,
     observed_data_y_uncertainties,
-    results_dir='/home/moon/mk3/example1/results/'
+    results_dir='/home/moon/mk3/example1/results/',
+    parameter_names=['a', 'b'],
+    plot_dir='/home/moon/mk3/example1/plots/',
 )
 
 N_samples = 1000
 optimizer.collect_samples(N_samples)
 
-
+optimizer.make_all_plots()
 # Change sampling settings, N walkers? Maybe make this optional with sensible defaults
 
 # run sampling and save results
