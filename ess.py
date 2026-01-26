@@ -45,7 +45,7 @@ if prior_uncertainties.ndim == 1:
 # for now, these are constants just saved here, but later we'll let the user set them elsewhere
 N_ZEUS_CHAINS = 2  # zeus paper recommends nchains=2 or 4
 N_WALKERS = 8
-N_SAMPLES = 1000
+N_SAMPLES = 5000
 N_ENSEMBLE_STEPS = int(N_SAMPLES / N_WALKERS)
 N_PARAMETERS = len(priors)
 
@@ -113,7 +113,7 @@ if RANK == 0:
     print("walker start points shape: ", walker_start_points.shape)
     print("nEnsembleSteps", N_ENSEMBLE_STEPS)
 
-
+full_chain = None
 # set up the zeus sampler
 with zeus.ChainManager(N_ZEUS_CHAINS) as cm:
     zeus_sampler = zeus.EnsembleSampler(
@@ -130,6 +130,7 @@ with zeus.ChainManager(N_ZEUS_CHAINS) as cm:
     chain = zeus_sampler.get_chain(flat=True, discard=0.1)
     logPs = zeus_sampler.get_log_prob(flat=True, discard=0.1)
 
+    full_chain = zeus_sampler.get_chain(flat=False, discard=0.1)
     # samples = zeus_sampler.samples.flatten(discard=0.1)
     np.save(f'chain_{RANK}.npy', chain)
     np.save(f'logPs_{RANK}.npy', logPs)
@@ -146,6 +147,9 @@ print(logP0.shape)
 MAP_index = np.argmin(np.abs(logP0 - np.max(logP0)))
 print('MAP:', logP0[MAP_index], chain0[MAP_index, :])
 
+
+# Plotting
+
 outdir = '/home/moon/mk3/'
 
 # maximalist plotting
@@ -160,3 +164,30 @@ outdir = '/home/moon/mk3/'
 
 # minimal hist
 plotting.make_histograms(outdir, chain0)
+
+
+# corner plot / posterior scatter matrix
+plotting.make_corner_plot(outdir, chain0)
+
+# corner plot / posterior scatter matrix
+plotting.make_posterior_scatter_matrix(outdir, chain0)
+
+# heat scatter matrix
+# maximal
+plotting.make_heat_scatter(
+    outdir,
+    chain0,
+    MAP=chain0[MAP_index, :],
+    mean=np.nanmean(chain0, axis=0),
+    initial=priors,
+    parameter_names=['a', 'b']
+)
+
+# minimal
+# plotting.make_heat_scatter(outdir, chain0)
+
+# minimal autocorrelation
+# plotting.make_autocorrelation(outdir, full_chain)
+
+# maximal autocorrelation
+plotting.make_autocorrelation(outdir, full_chain, parameter_names=['a', 'b'])

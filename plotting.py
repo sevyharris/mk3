@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors
 import matplotlib
 import zeus
+import zeus.autocorr
 import numpy as np
 import scipy.interpolate
 import pandas as pd
@@ -146,4 +147,46 @@ def make_heat_scatter(outdir, samples, MAP=None, mean=None, initial=None, parame
             outfile = os.path.join(outdir, f'heat_scatter_{y_name}_{x_name}.png')
             plt.savefig(outfile, bbox_inches='tight')
 
-        
+def make_autocorrelation(outdir, chain, parameter_names=None):
+    # chain should be N_samples x N_walkers x N_parameters, or NxWxP
+    N_taus = 15
+    N_samples, N_walkers, N_parameters = chain.shape
+    if parameter_names is not None:
+        assert len(parameter_names) == N_parameters
+
+    # estimate autocorrelation time at increasing # samples that is uniformly spaced on log scale
+    window_indices = np.logspace(0, np.log10(N_samples), N_taus).astype(int)
+
+    taus = np.zeros((N_taus, N_parameters)) 
+    for i, w in enumerate(window_indices):
+        taus[i, :] = zeus.autocorr.AutoCorrTime(chain[:w, :, :])
+
+    # make individual autocorrelation plots
+    for i in range(N_parameters):
+        plt.figure()
+        plt.loglog(window_indices, taus[:, i], marker='o', label=r'Estimated $\tau$')
+        plt.plot(window_indices, window_indices / 50.0, linestyle='dashed', color='black', label=r'$\tau$=N/50')
+
+        param_name = f'p{i}'
+        if parameter_names is not None:
+            param_name = parameter_names[i]
+        outfile = os.path.join(outdir, f'autocorr_{param_name}.png')
+        plt.xlabel('N Samples')
+        plt.ylabel(param_name + ' -- ' + r'Estimated $\tau$')
+        plt.legend()
+        plt.savefig(outfile, bbox_inches='tight')
+
+    # Make a combined autocorrelation plot
+    plt.figure()
+    for i in range(N_parameters):
+        param_name = f'p{i}'
+        if parameter_names is not None:
+            param_name = parameter_names[i]
+        plt.loglog(window_indices, taus[:, i], marker='o', label=param_name)
+    
+    plt.plot(window_indices, window_indices / 50.0, linestyle='dashed', color='black', label=r'$\tau$=N/50')
+    plt.xlabel('N Samples')
+    plt.ylabel(r'Estimated $\tau$')
+    plt.legend()
+    outfile = os.path.join(outdir, f'combined_autocorr.png')
+    plt.savefig(outfile, bbox_inches='tight')
