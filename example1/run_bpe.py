@@ -1,4 +1,5 @@
 # example script to run Bayesian Parameter Estimation
+import os
 import numpy as np
 import ess
 
@@ -34,9 +35,9 @@ optimizer = ess.BPEstimator(
     observed_data_x,
     observed_data_y,
     observed_data_y_uncertainties,
-    results_dir='/home/moon/mk3/example1/results/',
+    results_dir=os.path.join(os.path.dirname(__file__), 'results'),
     parameter_names=['a', 'b'],
-    plot_dir='/home/moon/mk3/example1/plots/',
+    plot_dir=os.path.join(os.path.dirname(__file__), 'plots'),
 )
 
 N_samples = 1000

@@ -119,16 +119,19 @@ class BPEstimator():
             # load one of the existing chains to check shape
             chain0_file = os.path.join(self.results_dir, 'chain_0.npy')
             if not os.path.exists(chain0_file):
-                raise FileNotFoundError(f"Cannot find existing chain file {chain0_file} for loading save point.")
-            chain0 = np.load(chain0_file)
+                print('Previous chain file does not exist, so we start from the beginning')
+                self.load_save_point = False
+                # raise FileNotFoundError(f"Cannot find existing chain file {chain0_file} for loading save point.")
+            else:
+                chain0 = np.load(chain0_file)
 
-            # check shape
-            if chain0.shape[2] != self.N_PARAMETERS:
-                raise ValueError(
-                    f"Loaded chain parameter dimension {chain0.shape} does not match current prior dimension {self.N_PARAMETERS}."
-                )
-            # probably not the end of the world if N_walkers or N_samples differ
-            print("Save point loaded successfully.")
+                # check shape
+                if chain0.shape[2] != self.N_PARAMETERS:
+                    raise ValueError(
+                        f"Loaded chain parameter dimension {chain0.shape} does not match current prior dimension {self.N_PARAMETERS}."
+                    )
+                # probably not the end of the world if N_walkers or N_samples differ
+                print("Save point loaded successfully.")
 
 
     # EXPANSION - could make some sort of factory for using other kinds of distributions
