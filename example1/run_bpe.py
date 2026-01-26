@@ -1,10 +1,6 @@
 # example script to run Bayesian Parameter Estimation
-
-import ess
-import yaml
-import sys
-import os
 import numpy as np
+import ess
 
 
 # define the observed data and associated uncertainties D, P(D)

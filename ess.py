@@ -4,24 +4,25 @@
 import os
 import numpy as np
 import dill
-import zeus
-import zeus.parallel
-import mpi4py
+
+# import mpi4py
 import scipy.stats
 import plotting
+import zeus
+import zeus.parallel
 
+from mpi4py import MPI
 
-global MPI
-
-from mpi4py import MPI as _MPI
-
-_MPI.pickle.__init__(dill.dumps, dill.loads, dill.HIGHEST_PROTOCOL)
-MPI = _MPI
+# global MPI
+# from mpi4py import MPI as _MPI
+# _MPI.pickle.__init__(dill.dumps, dill.loads, dill.HIGHEST_PROTOCOL)
+# MPI = _MPI
 
 # probably have to handle MPI stuff here
 N_PROCESSORS = MPI.COMM_WORLD.Get_size()
 RANK = MPI.COMM_WORLD.Get_rank()
 np.random.seed(400 + RANK)
+
 
 
 class BPEstimator():
@@ -69,7 +70,6 @@ class BPEstimator():
         self.observed_data_x = observed_data_x
         self.observed_data_y = observed_data_y
         self.observed_data_y_uncertainties = observed_data_y_uncertainties
-        self.sampler = None
 
         # convert 1D array of uncertainties (standard deviations) into 2D covariance matrix
         if self.prior_uncertainties.ndim == 1:
@@ -156,10 +156,9 @@ class BPEstimator():
             print("walker start points shape: ", walker_start_points.shape)
             print("nEnsembleSteps", N_samples)
 
-
         # set up the zeus sampler
         with zeus.ChainManager(self.N_ZEUS_CHAINS) as cm:
-            self.sampler = zeus.EnsembleSampler(
+            zeus_sampler = zeus.EnsembleSampler(
                 N_walkers,
                 self.N_PARAMETERS,
                 logprob_fn=self.get_log_posterior, 
@@ -168,14 +167,14 @@ class BPEstimator():
             )
 
             # run the zeus sampler
-            self.sampler.run_mcmc(walker_start_points, N_ENSEMBLE_STEPS)
+            zeus_sampler.run_mcmc(walker_start_points, N_ENSEMBLE_STEPS)
 
             # maybe turn this off, or implement better logging options
-            self.sampler.summary
+            zeus_sampler.summary
 
             # save files
-            chain = self.sampler.get_chain(flat=False, discard=discard)
-            logPs = self.sampler.get_log_prob(flat=False, discard=discard)
+            chain = zeus_sampler.get_chain(flat=False, discard=discard)
+            logPs = zeus_sampler.get_log_prob(flat=False, discard=discard)
 
             # convert from processor index to chain index
             proc2chain = self.get_processor_to_chain_index(N_PROCESSORS, self.N_ZEUS_CHAINS)
