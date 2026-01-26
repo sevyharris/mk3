@@ -243,23 +243,24 @@ class BPEstimator():
         if RANK > 0:
             return
 
-        # load just the first chain for now
+        flattened_combined_chain = np.load(os.path.join(self.results_dir, f'combined_chains.npy'))
+        flattened_combined_logP = np.load(os.path.join(self.results_dir, f'combined_logPs.npy'))
+
+        # Also load just the first chain for autocorrelation time
         chain0 = np.load(os.path.join(self.results_dir, 'chain_0.npy'))
         logP0 = np.load(os.path.join(self.results_dir, 'logPs_0.npy'))
 
-        flattened_chain0 = self.flatten_chain(chain0)
-        flattened_logP0 = self.flatten_logP0(logP0)
 
         # find MAP
-        MAP_index = np.argmin(np.abs(flattened_logP0 - np.max(flattened_logP0)))
-        print('MAP:', flattened_logP0[MAP_index], flattened_chain0[MAP_index, :])
+        MAP_index = np.argmin(np.abs(flattened_combined_logP - np.max(flattened_combined_logP)))
+        print('MAP:', flattened_combined_logP[MAP_index], flattened_combined_chain[MAP_index, :])
 
         # maximalist plotting
         plotting.make_histograms(
             self.plot_dir,
-            flattened_chain0,
-            MAP=flattened_chain0[MAP_index, :],
-            mean=np.nanmean(flattened_chain0, axis=0),
+            flattened_combined_chain,
+            MAP=flattened_combined_chain[MAP_index, :],
+            mean=np.nanmean(flattened_combined_chain, axis=0),
             initial=self.priors,
             parameter_names=self.parameter_names
         )
@@ -268,14 +269,14 @@ class BPEstimator():
         # plotting.make_corner_plot(plot_dir, flattened_chain0)
 
         # corner plot / posterior scatter matrix
-        plotting.make_posterior_scatter_matrix(self.plot_dir, flattened_chain0)
+        plotting.make_posterior_scatter_matrix(self.plot_dir, flattened_combined_chain)
 
         # heat scatter matrix
         plotting.make_heat_scatter(
             self.plot_dir,
-            flattened_chain0,
-            MAP=flattened_chain0[MAP_index, :],
-            mean=np.nanmean(flattened_chain0, axis=0),
+            flattened_combined_chain,
+            MAP=flattened_combined_chain[MAP_index, :],
+            mean=np.nanmean(flattened_combined_chain, axis=0),
             initial=self.priors,
             parameter_names=self.parameter_names
         )

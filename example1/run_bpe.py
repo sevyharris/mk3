@@ -41,7 +41,7 @@ optimizer = ess.BPEstimator(
 
 N_samples = 1000
 optimizer.collect_samples(N_samples)
-# optimizer.make_all_plots()
 
+# only execute this at the end (don't do these two if you're going to continue and run more)
 optimizer.compile_and_flatten_chains()
-
+optimizer.make_all_plots()
