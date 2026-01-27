@@ -83,6 +83,14 @@ class BPEstimator():
         self.observed_data_y_uncertainties = np.array(observed_data_y_uncertainties)
         self.parameter_names = parameter_names
 
+        # if priors are multidimensional, flatten them
+        if self.priors.ndim > 1:
+            self.priors = self.priors.ravel()
+        # if prior uncertainties are multidimensional and not square, flatten them
+        if self.prior_uncertainties.ndim > 1 and \
+                self.prior_uncertainties.shape[0] != self.prior_uncertainties.shape[1]:
+            self.prior_uncertainties = self.prior_uncertainties.ravel()
+
         # if you have multidimensional ys, then stack it into a single array
         if self.observed_data_y.ndim > 1:
             self.observed_data_y = self.observed_data_y.ravel()
@@ -97,8 +105,8 @@ class BPEstimator():
         if self.observed_data_y_uncertainties.ndim == 1:
             self.observed_data_y_uncertainties = np.diag(np.float_power(self.observed_data_y_uncertainties, 2.0))
 
-        np.save('ys.npy', self.observed_data_y)
-        np.save('y_uncertainties.npy', self.observed_data_y_uncertainties)
+        # np.save('ys.npy', self.observed_data_y)
+        # np.save('y_uncertainties.npy', self.observed_data_y_uncertainties)
 
 
         # load settings
@@ -158,18 +166,36 @@ class BPEstimator():
         )
         return log_prior
 
-    def get_log_likelihood(self, sim_results):
+    def get_log_likelihood(self, sim_results, independent=True):
         # if you have multiple ys, you should stack them
         # returns log P(D|H)
-        print('sim results', sim_results.shape)
-        print('y data', self.observed_data_y.shape)
-        log_likelihood = scipy.stats.multivariate_normal.logpdf(
-            x=sim_results,
-            mean=self.observed_data_y,
-            cov=self.observed_data_y_uncertainties,
-            allow_singular=True
-        )
-        print('LL', log_likelihood)
+        #print('sim results', sim_results.shape)
+        #print('y data', self.observed_data_y.shape)
+
+        if np.any(np.isnan(sim_results)):
+            return -np.inf
+
+        # add them up separately because that seems to fail a lot less often
+        # and I don't have correlations on the outputs anyways
+        if independent:
+            log_likelihood = 0
+            for i in range(len(sim_results)):
+                log_likelihood_i = scipy.stats.multivariate_normal.logpdf(
+                    x=sim_results[i],
+                    mean=self.observed_data_y[i],
+                    cov=self.observed_data_y_uncertainties[i, i]
+                )
+                if log_likelihood_i == -np.inf:
+                    log_likelihood_i = -1e80
+            log_likelihood += log_likelihood_i
+        else:
+            log_likelihood = scipy.stats.multivariate_normal.logpdf(
+                x=sim_results,
+                mean=self.observed_data_y,
+                cov=self.observed_data_y_uncertainties,
+                allow_singular=True
+            )
+        # print('LL', log_likelihood)
         return log_likelihood
 
 
@@ -182,7 +208,7 @@ class BPEstimator():
         sim_results = self.simulation_fn(parameters)
         log_likelihood = self.get_log_likelihood(sim_results)
         log_posterior = log_prior + log_likelihood
-        print('logP was', log_posterior)
+        print('logP=', log_posterior)
         return log_posterior
 
     def get_processor_to_chain_index(self, N_proc, N_chains):
@@ -244,14 +270,12 @@ class BPEstimator():
                 self.N_PARAMETERS,
                 logprob_fn=self.get_log_posterior, 
                 pool=cm.get_pool,
-                maxiter=1e6
+                maxiter=1e8,
+                verbose=True
             )
 
             # run the zeus sampler
             zeus_sampler.run_mcmc(walker_start_points, N_ENSEMBLE_STEPS)
-
-            # maybe turn this off, or implement better logging options
-            zeus_sampler.summary
 
             # save files
             chain = zeus_sampler.get_chain(flat=False, discard=discard)
@@ -274,6 +298,9 @@ class BPEstimator():
 
                 np.save(chain_file, chain)
                 np.save(logP_file, logPs)
+            
+            # maybe turn this off, or implement better logging options
+            zeus_sampler.summary
 
     def compile_and_flatten_chains(self):
         # This function combines all the chain .npys into a single .npy.

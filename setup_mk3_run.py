@@ -1,4 +1,4 @@
-# A script to set up a fresh PEUQSE run
+# A script to set up a fresh BPE run
 
 import os
 import shutil
@@ -12,21 +12,32 @@ import scipy.interpolate
 
 
 def get_i_thing(ref_composition, phase):
+    """
+    Get index of a requested Cantera species
+    ref_composition is a dictionary of the atom counts
+    phase is the cantera phase in which the species is stored
+    """
     for i in range(phase.n_species):
         if phase.species()[i].composition == ref_composition:
             return i
     assert False
 
-# ----------------- input params - change these for your run -----------------
-# vvvvvvvvvv
+
+# ------------------------------ Specify Mechanism  --------------------------
 # mech_yaml = '/home/harris.se/chem_annotated_noCH4X.yaml'
 mech_yaml = '/home/moon/chem_annotated_noCH4X.yaml'
+# ----------------------------------------------------------------------------
 
-# vvvvvvvvvv
+
+# ------------- Specify working directory for your next run-------------------
 # working_dir is where you want to set up your next run
 # working_dir = '/scratch/harris.se/guassian_scratch/my_kinetics_bpe0'
 # working_dir = '/home/moon/mk3/example_cantera'
 working_dir = '/home/moon/mk3/ct_example'
+# ----------------------------------------------------------------------------
+
+
+# In this house we don't overwrite existing files
 assert not os.path.exists(working_dir), f"Working directory {working_dir} already exists. Please choose a different one or delete it."
 os.makedirs(working_dir)
 
@@ -34,6 +45,8 @@ experimental_yaml_file = os.path.join(working_dir, 'experiment.yaml')
 prior_yaml_file = os.path.join(working_dir, 'prior.yaml')
 
 UNCERTAINTY_REPO = os.environ['UNCERTAINTY_REPO']
+
+# TODO - move default BPE scripts in mk3 repo
 base_run_bpe_py_script = os.path.join(UNCERTAINTY_REPO, 'bpe', 'simulation', 'run_bpe.py')
 base_run_bpe_sh_script = os.path.join(UNCERTAINTY_REPO, 'bpe', 'simulation', 'run_bpe.sh')
 shutil.copy(base_run_bpe_py_script, os.path.join(working_dir, 'run_bpe.py'))
@@ -44,6 +57,7 @@ shutil.copy(mech_yaml, os.path.join(working_dir, 'chem_annotated.yaml'))
 # load the mechanism yaml to get the species and reaction information
 gas = ct.Solution(mech_yaml)
 surf = ct.Interface(mech_yaml, "surface1", [gas])
+
 # Get indices of key species
 i_Ar = get_i_thing({'Ar': 1.0}, gas)
 i_CH4 = get_i_thing({'C': 1.0, 'H': 4.0}, gas)
@@ -63,19 +77,23 @@ i_CH3X = get_i_thing({'X': 1.0, 'H': 3.0, 'C': 1.0}, surf)
 i_H2OX = get_i_thing({'X': 1.0, 'H': 2.0, 'O': 1.0}, surf)
 i_H2X = get_i_thing({'X': 1.0, 'H': 2.0}, surf)
 
-# vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+# -------------- Pick the species/reactions you want to vary here -------- #
+# TODO let user vary gas species/reactions
 my_species_indices = []
 my_reaction_indices = [0, 1, 2, 3, 4, 5, 13, 14]
+# ------------------------------------------------------------------------ #
 for i in my_species_indices:
     print(f'Variable species {i}:', surf.species_names[i])
 for i in my_reaction_indices:
     print(f'Variable reaction {i}:', surf.reactions()[i].equation)
 
 
-# customizable vars
+# ------------------------- Set the experimental error ------------------- #
 experimental_error = 0.05
 MIN_EXP_ERROR = 1e-8
 
+
+# TODO make simulation separate from number of experimental points checked
 N_dist_pts = 20
 DIST_START = 0.000
 DIST_END = 0.010
@@ -88,7 +106,7 @@ pt_data_file = os.path.join(UNCERTAINTY_REPO, 'cpox_pt', 'horn_data', 'pt_profil
 df = pd.read_csv(pt_data_file)
 distances = (df['Distance (mm)'] - 10.0) / 1000.0  # ignore the 10mm of no/catalyst space
 
-
+# Make interpolation of temperature
 exp_Ts = df['Temperature (K)']
 f_T = scipy.interpolate.interp1d(distances, exp_Ts, fill_value='extrapolate')
 Ts = f_T(dist_array)
@@ -129,6 +147,7 @@ with open(experimental_yaml_file, 'w') as outfile:
 
 
 # -------------------------------- Prior Info --------------------------------
+# TODO - grab uncertainties from RMG uncertainty tool
 prior_data = {}
 
 n_sp = len(my_species_indices)
