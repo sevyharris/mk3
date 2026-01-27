@@ -1,0 +1,17 @@
+name: mk3
+channels:
+  - conda-forge
+  - cantera
+dependencies:
+  - python
+  - numpy
+  - scipy
+  - matplotlib
+  - pandas
+  - pyyaml
+  - jupyter
+  - cantera=3.2.0
+  - dill
+  - mpi4py
+  - pip
+  - zeus-mcmc
