@@ -208,7 +208,7 @@ class BPEstimator():
         sim_results = self.simulation_fn(parameters)
         log_likelihood = self.get_log_likelihood(sim_results)
         log_posterior = log_prior + log_likelihood
-        print('logP=', log_posterior)
+        # print('logP=', log_posterior)
         return log_posterior
 
     def get_processor_to_chain_index(self, N_proc, N_chains):
@@ -281,6 +281,11 @@ class BPEstimator():
             chain = zeus_sampler.get_chain(flat=False, discard=discard)
             logPs = zeus_sampler.get_log_prob(flat=False, discard=discard)
 
+            # note shape of chain and logPs
+            if RANK == 0:
+                print('single chain is ', chain.shape)
+                print('single logP is', logPs.shape)
+
             # convert from processor index to chain index
             proc2chain = self.get_processor_to_chain_index(N_PROCESSORS, self.N_ZEUS_CHAINS)
             if RANK in proc2chain.keys():
@@ -292,6 +297,7 @@ class BPEstimator():
                     # need to append instead of overwrite
                     prev_chain = np.load(chain_file)
                     prev_logP = np.load(logP_file)
+
 
                     chain = np.vstack((prev_chain, chain))
                     logPs = np.vstack((prev_logP, logPs))
