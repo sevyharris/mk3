@@ -1,4 +1,4 @@
-name: mk3
+name: mk3_env
 channels:
   - conda-forge
   - cantera
