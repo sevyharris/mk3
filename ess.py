@@ -76,17 +76,30 @@ class BPEstimator():
         load_save_point=False,
     ):
         self.simulation_fn = simulation_fn
-        self.priors = priors
-        self.prior_uncertainties = prior_uncertainties
-        self.observed_data_x = observed_data_x
-        self.observed_data_y = observed_data_y
-        self.observed_data_y_uncertainties = observed_data_y_uncertainties
+        self.priors = np.array(priors)
+        self.prior_uncertainties = np.array(prior_uncertainties)
+        self.observed_data_x = np.array(observed_data_x)
+        self.observed_data_y = np.array(observed_data_y)
+        self.observed_data_y_uncertainties = np.array(observed_data_y_uncertainties)
         self.parameter_names = parameter_names
+
+        # if you have multidimensional ys, then stack it into a single array
+        if self.observed_data_y.ndim > 1:
+            self.observed_data_y = self.observed_data_y.ravel()
+        # assume that a non-square matrix was intended to be a list of multidimensional outputs
+        if self.observed_data_y_uncertainties.ndim > 1 and \
+                self.observed_data_y_uncertainties.shape[0] != self.observed_data_y_uncertainties.shape[1]:
+            self.observed_data_y_uncertainties = self.observed_data_y_uncertainties.ravel()
+
         # convert 1D array of uncertainties (standard deviations) into 2D covariance matrix
         if self.prior_uncertainties.ndim == 1:
             self.prior_uncertainties = np.diag(np.float_power(self.prior_uncertainties, 2.0))
         if self.observed_data_y_uncertainties.ndim == 1:
             self.observed_data_y_uncertainties = np.diag(np.float_power(self.observed_data_y_uncertainties, 2.0))
+
+        np.save('ys.npy', self.observed_data_y)
+        np.save('y_uncertainties.npy', self.observed_data_y_uncertainties)
+
 
         # load settings
         # for now, these are constants just saved here, but later we'll let the user set them elsewhere
@@ -146,12 +159,17 @@ class BPEstimator():
         return log_prior
 
     def get_log_likelihood(self, sim_results):
+        # if you have multiple ys, you should stack them
         # returns log P(D|H)
+        print('sim results', sim_results.shape)
+        print('y data', self.observed_data_y.shape)
         log_likelihood = scipy.stats.multivariate_normal.logpdf(
             x=sim_results,
             mean=self.observed_data_y,
-            cov=self.observed_data_y_uncertainties
+            cov=self.observed_data_y_uncertainties,
+            allow_singular=True
         )
+        print('LL', log_likelihood)
         return log_likelihood
 
 
@@ -164,6 +182,7 @@ class BPEstimator():
         sim_results = self.simulation_fn(parameters)
         log_likelihood = self.get_log_likelihood(sim_results)
         log_posterior = log_prior + log_likelihood
+        print('logP was', log_posterior)
         return log_posterior
 
     def get_processor_to_chain_index(self, N_proc, N_chains):
@@ -179,7 +198,9 @@ class BPEstimator():
         return proc2chain
 
 
-    def collect_samples(self, N_samples, N_walkers=8, discard=0.1):
+    def collect_samples(self, N_samples, N_walkers=None, discard=0.1):
+        if N_walkers is None:
+            N_walkers = int(2 * self.N_PARAMETERS)
         N_ENSEMBLE_STEPS = int(N_samples / N_walkers)
 
         # EXTENSION other ways to initialize? uniform distribution?
