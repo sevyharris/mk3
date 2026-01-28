@@ -208,7 +208,7 @@ class BPEstimator():
         sim_results = self.simulation_fn(parameters)
         log_likelihood = self.get_log_likelihood(sim_results)
         log_posterior = log_prior + log_likelihood
-        # print('logP=', log_posterior)
+        #print('logP=', log_posterior)
         return log_posterior
 
     def get_processor_to_chain_index(self, N_proc, N_chains):
@@ -276,7 +276,7 @@ class BPEstimator():
 
             # run the zeus sampler
             zeus_sampler.run_mcmc(walker_start_points, N_ENSEMBLE_STEPS)
-
+            print('done collecting samples')
             # save files
             chain = zeus_sampler.get_chain(flat=False, discard=discard)
             logPs = zeus_sampler.get_log_prob(flat=False, discard=discard)
@@ -316,7 +316,6 @@ class BPEstimator():
         # then at the end they're combined into a single flattened, combined chain
         list_of_chains = []
         list_of_logPs = []
-        total_samples = 0
         for i in range(self.N_ZEUS_CHAINS):
             chain_file = os.path.join(self.results_dir, f'chain_{i}.npy')
             chain_i = np.load(chain_file)
@@ -325,7 +324,6 @@ class BPEstimator():
             logP_i = np.load(logPs_file)
 
             assert chain_i.shape[2] == self.N_PARAMETERS
-            total_samples += chain_i.shape[0]
             list_of_chains.append(self.flatten_chain(chain_i))
             list_of_logPs.append(self.flatten_logP(logP_i))
         combined_chains = np.vstack(list_of_chains)
@@ -343,7 +341,8 @@ class BPEstimator():
         # https://github.com/minaskar/zeus/blob/1abdf08252a99e9aa186dcee414f559624b3bafd/zeus/samples.py#L90
         # Copied from zeus sample.flatten()
         assert chain.ndim == 3
-        return chain.reshape((-1, 2), order='F')
+        assert chain.shape[2] == self.N_PARAMETERS
+        return chain.reshape((-1, chain.shape[2]), order='F')
         
 
     def flatten_logP(self, logP):
