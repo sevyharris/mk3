@@ -57,6 +57,7 @@ def make_histograms(outdir, samples, MAP=None, mean=None, initial=None, paramete
             plt.legend()
 
         plt.savefig(outfile, bbox_inches='tight')
+        plt.close()
 
 
 def make_corner_plot(outdir, samples):
@@ -65,6 +66,7 @@ def make_corner_plot(outdir, samples):
     fig, axes = zeus.cornerplot(samples[::100], size=(16,16))
     outfile = os.path.join(outdir, 'cornerplot.png')
     plt.savefig(outfile, bbox_inches='tight')
+    plt.close()
 
 
 def make_posterior_scatter_matrix(outdir, samples, parameter_names=None):
@@ -80,6 +82,7 @@ def make_posterior_scatter_matrix(outdir, samples, parameter_names=None):
     outfile = os.path.join(outdir, 'posterior_scatter_matrix.png')
 
     plt.savefig(outfile, bbox_inches='tight')
+    plt.close()
 
 
 def make_heat_scatter(outdir, samples, MAP=None, mean=None, initial=None, parameter_names=None, **kwargs):
@@ -146,6 +149,7 @@ def make_heat_scatter(outdir, samples, MAP=None, mean=None, initial=None, parame
 
             outfile = os.path.join(outdir, f'heat_scatter_{y_name}_{x_name}.png')
             plt.savefig(outfile, bbox_inches='tight')
+            plt.close()
 
 def make_autocorrelation(outdir, chain, parameter_names=None):
     # chain should be N_samples x N_walkers x N_parameters, or NxWxP
@@ -175,6 +179,7 @@ def make_autocorrelation(outdir, chain, parameter_names=None):
         plt.ylabel(param_name + ' -- ' + r'Estimated $\tau$')
         plt.legend()
         plt.savefig(outfile, bbox_inches='tight')
+        plt.close()
 
     # Make a combined autocorrelation plot
     plt.figure()
@@ -190,3 +195,4 @@ def make_autocorrelation(outdir, chain, parameter_names=None):
     plt.legend()
     outfile = os.path.join(outdir, f'combined_autocorr.png')
     plt.savefig(outfile, bbox_inches='tight')
+    plt.close()
