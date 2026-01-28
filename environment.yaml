@@ -13,5 +13,8 @@ dependencies:
   - cantera=3.2.0
   - dill
   - mpi4py
+  # I had to include this for Explorer because I'm using openmpi and the module isn't compatible with Intel built mpi4py
+  # https://mpi4py.readthedocs.io/en/stable/install.html#conda-packages
+  - openmpi
   - pip
   - zeus-mcmc
