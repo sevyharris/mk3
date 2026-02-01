@@ -24,6 +24,17 @@ RANK = MPI.COMM_WORLD.Get_rank()
 np.random.seed(400 + RANK)
 
 
+def flatten_chain(chain):
+    # https://github.com/minaskar/zeus/blob/1abdf08252a99e9aa186dcee414f559624b3bafd/zeus/samples.py#L90
+    # Copied from zeus sample.flatten()
+    assert chain.ndim == 3
+    return chain.reshape((-1, chain.shape[2]), order='F')
+    
+
+def flatten_logP(logP):
+    assert logP.ndim == 2
+    return logP.reshape((-1,), order='F')
+
 class BPEstimator():
     """
     Bayesian Parameter Estimator using zeus ensemble slice sampling.
@@ -82,6 +93,8 @@ class BPEstimator():
         self.observed_data_y = np.array(observed_data_y)
         self.observed_data_y_uncertainties = np.array(observed_data_y_uncertainties)
         self.parameter_names = parameter_names
+        self.load_save_point = load_save_point
+        # if we're loading a previous savepoint, need to check the shape of things
 
         # if priors are multidimensional, flatten them
         if self.priors.ndim > 1:
@@ -122,6 +135,7 @@ class BPEstimator():
         if results_dir is not None:
             self.results_dir = results_dir
         if not os.path.exists(self.results_dir):
+            self.load_save_point = False
             os.makedirs(self.results_dir, exist_ok=True)
 
         self.plot_dir = './plots'
@@ -130,8 +144,6 @@ class BPEstimator():
         if not os.path.exists(self.plot_dir):
             os.makedirs(self.plot_dir, exist_ok=True)
 
-        self.load_save_point = load_save_point
-        # if we're loading a previous savepoint, need to check the shape of things
 
         # check for existing chains if loading save point, but don't actually load here
         if self.load_save_point and RANK == 0:
@@ -187,7 +199,7 @@ class BPEstimator():
                 )
                 if log_likelihood_i == -np.inf:
                     log_likelihood_i = -1e80
-            log_likelihood += log_likelihood_i
+                log_likelihood += log_likelihood_i
         else:
             log_likelihood = scipy.stats.multivariate_normal.logpdf(
                 x=sim_results,
